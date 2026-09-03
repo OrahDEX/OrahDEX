@@ -78,7 +78,8 @@ const Chart = ({ symbol, interval }: ChartProps) => {
 
   return (
     <div>
-      {loading ? <div>Loading...</div> : <div ref={chartRef} style={{position: 'relative', width: '100%', height: '300px'}} />}
+      {loading ? <p>Loading chart data...</p> : <div ref={chartRef} style={{ height: '400px', width: '100%' }} />}
+      {!loading && chartData.length === 0 && <p>No data available for the selected interval.</p>}
     </div>
   );
 };
