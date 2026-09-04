@@ -164,7 +164,8 @@ function LiquidityTab() {
   const fetchAll = useCallback(async () => {
     try {
       const poolsRes = await fetch(`${API_BASE}/api/lp/pools`);
-      const poolsData: LpPool[] = await poolsRes.json();
+      const poolsRaw = await poolsRes.json();
+      const poolsData: LpPool[] = Array.isArray(poolsRaw) ? poolsRaw : [];
       setPools(poolsData);
       if (!selected && poolsData.length) {
         setSelected(poolsData[0]);
@@ -504,7 +505,9 @@ function ProvidersTab() {
         const coinsRaw = await coinsRes.json();
         const provRaw  = await providersRes.json();
         if (cancelled) return;
-        const coinsData: PosCoin[]  = Array.isArray(coinsRaw) ? coinsRaw : [];
+        // API returns { coins: [...], dataSource, custodialDisclosure } — unwrap
+        const coinsData: PosCoin[]  = Array.isArray(coinsRaw) ? coinsRaw
+          : Array.isArray(coinsRaw?.coins) ? coinsRaw.coins : [];
         const provData:  Provider[] = Array.isArray(provRaw)  ? provRaw  : [];
         setCoins(coinsData);
         setProviders(provData);
@@ -608,7 +611,7 @@ function ProvidersTab() {
       <div className="grid grid-cols-3 gap-2">
         <StatCard label="PoS Coins" value={String(coins.length)} icon={<Coins size={12} />} />
         <StatCard label="Providers" value={String(providers.length)} icon={<Shield size={12} />} />
-        <StatCard label="Best APY" value={fmtApy(Math.max(...coins.map(c => c.apy)))} icon={<TrendingUp size={12} />} />
+        <StatCard label="Best APY" value={coins.length ? fmtApy(Math.max(...coins.map(c => c.apy))) : "—"} icon={<TrendingUp size={12} />} />
       </div>
 
       {/* Coin list */}
@@ -752,7 +755,9 @@ function EarnTab() {
     try {
       const res  = await fetch(`${API_BASE}/api/staking/coins`);
       const raw  = await res.json();
-      const data: PosCoin[] = Array.isArray(raw) ? raw : [];
+      // API returns { coins: [...], dataSource, custodialDisclosure } — unwrap
+      const data: PosCoin[] = Array.isArray(raw) ? raw
+        : Array.isArray(raw?.coins) ? raw.coins : [];
       setCoins(data);
       if (data.length && !selectedCoin) setSelectedCoin(data[0]);
     } finally {
@@ -1171,7 +1176,7 @@ function PositionCard({
 
       <button
         onClick={() => onUnstake(pos)}
-        disabled={isUnstaking || (locked && false)}
+        disabled={isUnstaking || locked}
         className={cn(
           "w-full py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1",
           isUnstaking

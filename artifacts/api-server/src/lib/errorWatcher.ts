@@ -20,7 +20,7 @@
 import { logger } from "./logger.js";
 import { logIncident } from "./serviceState.js";
 import { emit as emitAlert } from "./alertBus.js";
-import { pool } from "@workspace/db";
+import { pool, type PoolClient } from "@workspace/db";
 import type { AlertCategory, AlertSeverity } from "./alertBus.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ interface PatternState {
 
 async function pingDbPool(): Promise<string> {
   try {
-    const client = await Promise.race<Awaited<ReturnType<typeof pool.connect>>>([
+    const client = await Promise.race<PoolClient>([
       pool.connect(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("ping timeout")), 4_000)

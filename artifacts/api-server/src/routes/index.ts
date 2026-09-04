@@ -4,6 +4,8 @@ import diagnosticsRouter from "./diagnostics.js";
 import aiRouter from "./ai.js";
 import devaiRouter from "./devai.js";
 import marketsRouter from "./markets.js";
+// markets default export
+// markets default export
 import ordersRouter from "./orders.js";
 import tradesRouter from "./trades.js";
 import portfolioRouter from "./portfolio.js";

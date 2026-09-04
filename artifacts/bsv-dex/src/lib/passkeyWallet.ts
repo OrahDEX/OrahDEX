@@ -1179,7 +1179,7 @@ export async function signBsvChallengeFromSecret(
   secret:  string,
 ): Promise<string> {
   const { sha256 }    = await import("@noble/hashes/sha2.js");
-  const { secp256k1 } = await import("@noble/curves/secp256k1");
+  const { secp256k1 } = await import("@noble/curves/secp256k1.js");
   const bsvPrivKey    = await deriveBsvPrivKeyFromSecret(secret);
 
   const msgBuf = new TextEncoder().encode(message);
@@ -1196,10 +1196,23 @@ export async function signBsvChallengeFromSecret(
   preimage.set(varint, prefix.length);
   preimage.set(msgBuf, prefix.length + varint.length);
 
-  const msgHash     = sha256(sha256(preimage));
-  const sig         = secp256k1.sign(msgHash, bsvPrivKey, { lowS: true, prehash: false });
-  const recoveryBit = sig.recovery ?? 0;
-  const compact64   = sig.toCompactRawBytes();
-  const sigBytes    = new Uint8Array([31 + recoveryBit, ...compact64]);
+  const msgHash  = sha256(sha256(preimage));
+
+  // @noble/curves v2.x: sign() returns raw 64-byte compact Uint8Array (r‖s),
+  // NOT a Signature object — so there is no .toCompactRawBytes() or .recovery.
+  // Recovery bit must be brute-forced by trying both values and checking which
+  // one recovers back to our known public key (same as bsvTx signing above).
+  const compact64    = secp256k1.sign(msgHash, bsvPrivKey, { lowS: true, prehash: false });
+  const expectedPub  = secp256k1.getPublicKey(bsvPrivKey, true);
+  let recoveryBit    = 0;
+  for (let rec = 0; rec <= 1; rec++) {
+    const probe     = new Uint8Array([rec, ...compact64]);
+    const recovered = secp256k1.recoverPublicKey(probe, msgHash, { prehash: false });
+    if (recovered.length === expectedPub.length && recovered.every((b, i) => b === expectedPub[i])) {
+      recoveryBit = rec;
+      break;
+    }
+  }
+  const sigBytes = new Uint8Array([31 + recoveryBit, ...compact64]);
   return btoa(String.fromCharCode(...sigBytes));
 }

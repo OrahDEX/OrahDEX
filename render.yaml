@@ -1,0 +1,20 @@
+# Exported from Render on 2026-08-13T07:18:42Z
+version: "1"
+services:
+- type: web
+  name: OrahDEX
+  runtime: node
+  repo: https://github.com/aaurah/OrahDEX
+  plan: free
+  envVars:
+  - key: NODE_ENV
+    sync: false
+  - key: PORT
+    sync: false
+  - key: DATABASE_URL
+    sync: false
+  region: oregon
+  buildCommand: pnpm install && pnpm run build
+  startCommand: pnpm run start
+  autoDeployTrigger: commit
+  rootDir: artifacts/api-server

@@ -1,0 +1,20 @@
+# Dockerfile.frontend — builds static frontend and serves via nginx
+
+FROM node:20-alpine AS build
+WORKDIR /app
+RUN apk add --no-cache git curl
+RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+# Attempt to build a workspace frontend; adjust the script name if your workspace differs
+RUN if pnpm -w -s run build; then echo 'build ok'; else echo 'no build script'; fi
+
+FROM nginx:stable-alpine
+# Copy built assets: common monorepo conventions place artifacts or dist folders — adapt as needed
+COPY --chown=nginx:nginx /app/artifacts/frontend /usr/share/nginx/html
+# Fallback: if /app/public exists, copy it (some apps use public/)
+COPY --chown=nginx:nginx /app/public /usr/share/nginx/html
+
+EXPOSE 80
+CMD ["nginx","-g","daemon off;"]

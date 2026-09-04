@@ -981,17 +981,11 @@ export function WithdrawSheet({
       }
 
       // ── BSV: direct on-chain transaction ────────────────────────────────────
-      // The "On-chain Balance" shown is the user's REAL BSV at their passkey
-      // wallet address (fetched from WhatsOnChain). It is NOT in the exchange
-      // internal ledger, so going through /api/withdrawals would fail with
-      // "platform liquidity" because that endpoint checks the internal ledger.
-      //
-      // Instead we build, sign and broadcast a P2PKH transaction directly using
-      // the passkey-derived BSV private key — no exchange API involved.
-      //
-      // If the recipient is a $handle (but HandCash is not connected for sending),
-      // resolve the handle to a BSV address first via the backend.
-      if (activeChain === "bsv") {
+      // Only used when the user has NO exchange balance (available === 0).
+      // When available > 0, the user's BSV lives in the OrahDEX internal ledger
+      // and must be withdrawn via /api/withdrawals (exchange path below), not
+      // by building a raw P2PKH UTXO transaction.
+      if (activeChain === "bsv" && available <= 0) {
         let recipient = nonEvmSendRecipient.trim();
         if (isHandCashHandle(recipient)) {
           const raw = recipient.replace(/^\$/, "").replace(/@handcash\.io$/i, "");
@@ -1893,29 +1887,47 @@ export function WithdrawSheet({
             {/* ── WALLET SEND — non-EVM (BSV, LTC, XRP…) ───────────────── */}
             {withdrawChainMode !== "evm" && (
               <>
-                {/* Balance display */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border">
-                  <div>
-                    <p className="text-xs text-muted-foreground">On-chain Balance</p>
-                    <p className="text-sm font-bold font-mono text-foreground">
-                      {nonEvmSendBalFetch
-                        ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /> Loading…</span>
-                        : nonEvmSendBalance !== null
-                          ? `${nonEvmSendBalance.toFixed(8)} ${withdrawChainMode.toUpperCase()}`
-                          : <span className="text-muted-foreground/60">—</span>
-                      }
-                    </p>
+                {/* Balance display — prefer OrahDEX exchange balance when available */}
+                {available > 0 ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/8 border border-emerald-500/25">
+                    <div>
+                      <p className="text-xs text-emerald-400 font-medium">OrahDEX Balance</p>
+                      <p className="text-sm font-bold font-mono text-foreground">
+                        {available.toFixed(8)} {withdrawChainMode.toUpperCase()}
+                      </p>
+                    </div>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+                      Trading
+                    </span>
                   </div>
-                  <button
-                    onClick={fetchNonEvmBalance}
-                    disabled={nonEvmSendBalFetch}
-                    className="text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-40"
-                  >
-                    Refresh
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 border border-border">
+                    <div>
+                      <p className="text-xs text-muted-foreground">On-chain Balance</p>
+                      <p className="text-sm font-bold font-mono text-foreground">
+                        {nonEvmSendBalFetch
+                          ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" /> Loading…</span>
+                          : nonEvmSendBalance !== null
+                            ? `${nonEvmSendBalance.toFixed(8)} ${withdrawChainMode.toUpperCase()}`
+                            : <span className="text-muted-foreground/60">—</span>
+                        }
+                      </p>
+                    </div>
+                    <button
+                      onClick={fetchNonEvmBalance}
+                      disabled={nonEvmSendBalFetch}
+                      className="text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-40"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                )}
 
                 {/* Amount */}
+                {/* effectiveMax: exchange balance takes priority over on-chain balance */}
+                {(() => {
+                  const effectiveMax = available > 0 ? available : nonEvmSendBalance;
+                  return (
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold">Amount ({withdrawChainMode.toUpperCase()})</label>
                   <div className="relative">
@@ -1928,21 +1940,23 @@ export function WithdrawSheet({
                       onChange={e => setNonEvmSendAmount(e.target.value)}
                       className="h-11 pr-14 font-mono"
                     />
-                    {nonEvmSendBalance !== null && (
+                    {effectiveMax !== null && (
                       <button
-                        onClick={() => setNonEvmSendAmount(nonEvmSendBalance.toFixed(8))}
+                        onClick={() => setNonEvmSendAmount((Math.floor(effectiveMax * 1e8) / 1e8).toFixed(8))}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-primary hover:text-primary/80 px-2 py-0.5 rounded bg-primary/10 hover:bg-primary/20 transition-colors"
                       >
                         MAX
                       </button>
                     )}
                   </div>
-                  {nonEvmSendBalance !== null && parseFloat(nonEvmSendAmount) > nonEvmSendBalance && (
+                  {effectiveMax !== null && parseFloat(nonEvmSendAmount) > effectiveMax && (
                     <p className="text-xs text-red-400 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> Exceeds wallet balance
+                      <AlertCircle className="w-3 h-3" /> Exceeds {available > 0 ? "OrahDEX" : "wallet"} balance
                     </p>
                   )}
                 </div>
+                  );
+                })()}
 
                 {/* Recipient */}
                 {/* HandCash connected banner (BSV only) */}
@@ -2151,7 +2165,9 @@ export function WithdrawSheet({
                       onClick={handleNonEvmWalletSend}
                       disabled={
                         !nonEvmSendAmount || !nonEvmSendRecipient.trim() || nonEvmSending ||
-                        (nonEvmSendBalance !== null && parseFloat(nonEvmSendAmount) > nonEvmSendBalance) ||
+                        (available > 0
+                          ? parseFloat(nonEvmSendAmount) > available
+                          : nonEvmSendBalance !== null && parseFloat(nonEvmSendAmount) > nonEvmSendBalance) ||
                         !canSend
                       }
                       className={cn(

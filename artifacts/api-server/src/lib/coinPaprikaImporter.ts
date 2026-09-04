@@ -50,7 +50,7 @@ export async function runCoinPaprikaImport(): Promise<{ upserted: number }> {
     });
     if (!res.ok) throw new Error(`CoinPaprika HTTP ${res.status}`);
 
-    const coins: PaprikaCoin[] = await res.json();
+    const coins = (await res.json()) as PaprikaCoin[];
 
     // Deduplicate by symbol: prefer active coins, then lower rank
     const bySymbol = new Map<string, PaprikaCoin>();

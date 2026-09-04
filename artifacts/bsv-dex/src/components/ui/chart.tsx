@@ -1,3 +1,4 @@
+"use client"
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
@@ -79,23 +80,22 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
       dangerouslySetInnerHTML={{
         // Values are developer-supplied chart config (not user input).
         // Strip </style> sequences to satisfy CodeQL css-injection rule.
+        // Quote and escape the data-chart attribute value so the generated
+        // selector cannot be broken by special characters.
         __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    // Sanitize: remove any </style> that could break out of the style block
-    const safe = color ? color.replace(/<\/style>/gi, "") : null
-    return safe ? `  --color-${key}: ${safe};` : null
-  })
-  .join("\n")}
-}
-`
-          )
+          .map(([theme, prefix]) => {
+            const escapedId = String(id).replace(/"/g, '\\"')
+            return `\n${prefix} [data-chart="${escapedId}"] {\n${colorConfig
+              .map(([key, itemConfig]) => {
+                const color =
+                  itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+                  itemConfig.color
+                // Sanitize: remove any </style> that could break out of the style block
+                const safe = color ? String(color).replace(/<\/style>/gi, "") : null
+                return safe ? `  --color-${key}: ${safe};` : null
+              })
+              .join("\n")}\n}\n`
+          })
           .join("\n"),
       }}
     />
@@ -202,7 +202,7 @@ const ChartTooltipContent = React.forwardRef<
 
               return (
                 <div
-                  key={item.dataKey}
+                  key={`${item.dataKey ?? index}`}
                   className={cn(
                     "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                     indicator === "dot" && "items-center"

@@ -1,4 +1,3 @@
-// Updated Markets.tsx to remove auto from BSV/USDT
 import { useState, useEffect, useRef, useMemo } from "react";
 import { CoinLogo } from "@/components/CoinLogo";
 import { useStagedMarkets as useGetMarkets, useMarketSearch } from "@/hooks/useStagedMarkets";
@@ -59,6 +58,7 @@ const USD_SUBS: { id: UsdSub; label: string }[] = [
   { id: "USDD", label: "USDD" },
 ];
 
+
 interface TabMeta { id: Tab; label: string; color: string; desc: string }
 const TAB_META: TabMeta[] = [
   { id: "favorites", label: "★ Favorites", color: "text-green-400",   desc: "Your starred pairs" },
@@ -102,8 +102,11 @@ function normalise(m: any): any {
   const chg   = parseFloat(m.priceChangePercent24h ?? m.priceChangePercent ?? m.change) || 0;
   const vol   = parseFloat(m.volume24h ?? m.volume) || 0;
   const type  = m.type ?? (m.symbol?.includes("PERP") ? "futures" : "spot");
-  return { ...m, symbol: m.symbol ?? `${base}-${quote}` };
+  return { ...m, symbol: m.symbol ?? `${base}-${quote}`, baseAsset: base, quoteAsset: quote,
+    lastPrice: price, priceChangePercent24h: chg, volume24h: vol, type };
 }
+
+
 const STABLE_MOCK: Record<UsdSub, any[]> = {
   USDT: USDT_MARKETS, USDC: USDC_MARKETS, TUSD: TUSD_MARKETS, USDD: USDD_MARKETS,
 };
@@ -1126,3 +1129,6 @@ function CoinDetailPanel({
           )}
         </div>
       </div>
+    </>
+  );
+}

@@ -1,62 +1,84 @@
-// Updated markets.ts to remove auto from BSV/USDT
-import { Router, type IRouter } from "express";
-import { db, withDbRetry } from "@workspace/db";
-import { marketsTable, ordersTable } from "@workspace/db/schema";
-import { eq, and, desc, inArray, ne, sql } from "drizzle-orm";
-import { FALLBACK_PRICES } from "../lib/priceUpdater.js";
-import { fetchKeyPrices } from "./dex.js";
-import { generateRecentTrades, generateTicker } from "../lib/mockData.js";
-import { fetchRealCandles, fetchFullHistoryCandles, resampleCandles } from "../lib/candleFetcher.js";
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { marketsTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { fetchRealCandles } from "../lib/candleFetcher.js";
+import { FALLBACK_PRICES } from "../lib/priceUpdater.js";
 
-const router: IRouter = Router();
+const router = Router();
 
-// ─── Simple in-memory TTL cache ─────────────────────────────────────────────────
-interface CacheEntry<T> { data: T; ts: number }
-class TtlCache<T> {
-  private store = new Map<string, CacheEntry<T>>();
-  constructor(private ttlMs: number) {}
-  get(key: string): T | null {
-    const e = this.store.get(key);
-    if (!e) return null;
-    if (Date.now() - e.ts > this.ttlMs) { this.store.delete(key); return null; }
-    return e.data;
-  }
-  set(key: string, data: T) { this.store.set(key, { data, ts: Date.now() }); }
+const STABLE_QUOTES = new Set(["USDT", "USDC", "USD", "BUSD", "TUSD", "USDD", "DAI", "FDUSD"]);
+
+/** Normalize a URL path symbol (e.g. "BTC-USDT", "btc_usdt") to "BTC/USDT". */
+function normSymbol(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[-_]/g, "/");
 }
 
-const marketsCache    = new TtlCache<any[]>(60_000);   // 60 s — matches price-updater interval
-const orderbookCache  = new TtlCache<any>(2_000);      //  2 s
-const tradesCache     = new TtlCache<any[]>(5_000);    //  5 s
-const tickerCache     = new TtlCache<any>(5_000);      //  5 s
+/**
+ * Resolve a USD-denominated price for a pair.
+ * Prefers the live DB lastPrice; falls back to a cross-rate derived from
+ * FALLBACK_PRICES when the DB row is missing, stale, or zero.
+ */
+function resolveCrossPrice(symbol: string, lastPrice: number): number {
+  if (Number.isFinite(lastPrice) && lastPrice > 0) return lastPrice;
+  const [base, quote] = symbol.split("/");
+  if (!base || !quote) return 0;
+  const baseUsd  = FALLBACK_PRICES[base] ?? 0;
+  const quoteUsd = STABLE_QUOTES.has(quote) ? 1 : (FALLBACK_PRICES[quote] ?? 0);
+  if (baseUsd > 0 && quoteUsd > 0) return baseUsd / quoteUsd;
+  return 0;
+}
 
-// GET /markets
-router.get("/markets", async (req, res) => {
-    // Build a cache key that reflects any filters
-    const rawType     = req.query.type     as string | undefined;
-    const rawCategory = req.query.category as string | undefined;
+router.get("/markets/:symbol/candles", async (req, res) => {
+  try {
+    const symbol   = normSymbol(req.params.symbol);
+    const interval = (req.query.interval as string) || "1h";
+    const limit    = Math.min(parseInt(req.query.limit as string) || 200, 1500);
 
-    let types: string[] = [];
-    if (rawCategory === "internal") {
-        types = ["spot", "futures"];
-    } else if (rawCategory === "external") {
-        types = ["letsexchange"];
-    } else if (rawType) {
-        types = rawType.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+    // Wrap DB lookup so a transient DB failure falls through to FALLBACK_PRICES
+    let market: (typeof marketsTable.$inferSelect) | undefined;
+    try {
+      [market] = await db.select().from(marketsTable).where(eq(marketsTable.symbol, symbol));
+    } catch (dbErr) {
+      logger.warn({ err: dbErr, symbol }, "markets: DB lookup failed, using FALLBACK_PRICES");
+      market = undefined;
     }
 
-    const baseKey  = types.length ? `filtered:${types.sort().join(",")}` : "all";
-    const cacheKey = baseKey; // we cache the full sorted list once and slice it
+    let price: number;
+    let sym: string;
+    if (!market) {
+      // Unknown pair or DB unavailable — derive from fallback prices
+      price = resolveCrossPrice(symbol, 0);
+      sym   = symbol;
+    } else {
+      // Prefer live DB price; fall back to cross-rate computation if DB is stale/zero
+      price = resolveCrossPrice(market.symbol, parseFloat(market.lastPrice));
+      sym   = market.symbol;
+    }
+
+    if (!price || price <= 0) {
+      logger.warn({ symbol, interval }, "No price available for candles");
+      res.json([]);
+      return;
+    }
 
     try {
-        // Fetch the markets based on the filters and cache the result
-        const markets = await getMarketData(cacheKey);
-        res.json(markets);
-    } catch (error) {
-        logger.error("Failed to fetch markets:", error);
-        res.status(500).send("Internal Server Error");
+      const candles = await fetchRealCandles(sym, price, interval, limit);
+      if (candles && candles.length > 0) {
+        res.json(candles);
+        return;
+      }
+    } catch (fetchErr) {
+      logger.warn({ err: fetchErr, symbol, interval }, "fetchRealCandles failed, returning empty");
     }
-});
 
-// Further routes and logic unchanged;
-// Implement any other necessary updates related to auto removal as per your requirements.
+    // Fallback: return empty array if fetch completely failed
+    // (Frontend will use prior data via fallback mechanism)
+    res.json([]);
+  } catch (err) {
+    req.log.error({ err }, "Failed to get candles");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+export default router;

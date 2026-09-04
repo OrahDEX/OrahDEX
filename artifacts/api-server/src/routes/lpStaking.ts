@@ -16,6 +16,7 @@ import { db } from "@workspace/db";
 import { lpPositionsTable } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { debitAvailable, creditAvailable } from "../lib/ledger.js";
 import crypto from "node:crypto";
 
 const router: IRouter = Router();
@@ -213,6 +214,10 @@ router.post("/lp/deposit", async (req, res) => {
   const id        = crypto.randomUUID();
 
   try {
+    // ── Debit the user's exchange balance first ───────────────────────────────
+    // Throws INSUFFICIENT_FUNDS if they don't have enough available.
+    await debitAvailable(String(walletAddress), coin, String(amt));
+
     const [inserted] = await db.insert(lpPositionsTable).values({
       id,
       walletAddress:  String(walletAddress).toLowerCase(),
@@ -232,6 +237,12 @@ router.post("/lp/deposit", async (req, res) => {
       message: `Deposited ${amt} ${coin} into ${pool} pool at ${apy}% APY`,
     });
   } catch (err: any) {
+    if (String(err?.message).startsWith("INSUFFICIENT_FUNDS")) {
+      const parts = String(err.message).split(":");
+      const have = parts[2]?.replace("have ", "") ?? "0";
+      res.status(400).json({ error: `Insufficient ${coin} balance. Available: ${parseFloat(have).toFixed(8)} ${coin}` });
+      return;
+    }
     logger.error({ err }, "lp /deposit failed");
     res.status(500).json({ error: "Failed to create LP position" });
   }
@@ -277,12 +288,23 @@ router.post("/lp/withdraw/:id", async (req, res) => {
     const amt       = parseFloat(String(existing.amount));
     const apy       = parseFloat(String(existing.apy));
     const reward    = calcReward(amt, apy, new Date(existing.startedAt));
+    const total     = (amt + reward).toFixed(18);
 
+    // ── Mark withdrawn first, then credit — any credit failure is logged
+    //    but the position is still closed to prevent re-withdrawal ────────────
     const [updated] = await db
       .update(lpPositionsTable)
       .set({ status: "withdrawn", withdrawnAt: new Date(), rewardAccrued: String(reward.toFixed(8)) })
       .where(eq(lpPositionsTable.id, id))
       .returning();
+
+    // Credit principal + accrued rewards back to exchange balance
+    try {
+      await creditAvailable(String(walletAddress), existing.coin, total);
+    } catch (creditErr: any) {
+      logger.error({ creditErr, walletAddress, coin: existing.coin, total }, "lp /withdraw: credit failed after marking withdrawn");
+      // Position is already marked withdrawn — don't fail the response, but log for manual reconciliation
+    }
 
     res.json({
       ...updated,

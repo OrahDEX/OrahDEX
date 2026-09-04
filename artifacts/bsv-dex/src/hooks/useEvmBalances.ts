@@ -73,7 +73,7 @@ export const ERC20_TOKENS: Record<number, Array<{ symbol: string; name: string; 
     { symbol: "XRP",   name: "XRP Token",            address: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE", decimals: 18, color: "#00AAE4" },
     { symbol: "ADA",   name: "Cardano Token",        address: "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47", decimals: 18, color: "#0033AD" },
     { symbol: "DOT",   name: "Polkadot Token",       address: "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402", decimals: 18, color: "#E6007A" },
-    { symbol: "LINK",  name: "Chainlink",            address: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD", decimals: 18, color: "#3B82F6" },
+    { symbol: "LINK",  name: "Chainlink",            address: "0xF8A0BF9cFF54Bb92F17374d9e9A321E6a111a51bD", decimals: 18, color: "#3B82F6" },
     { symbol: "UNI",   name: "Uniswap",              address: "0xBf5140A22578168FD562DCcF235E5D43A02ce9B1", decimals: 18, color: "#FF007A" },
     { symbol: "AVAX",  name: "Avalanche Token",      address: "0x1CE0c2827e2eF14D5C4f29a091d735A204794041", decimals: 18, color: "#E84142" },
     { symbol: "MATIC", name: "Polygon Token",        address: "0xCC42724C6683B7E57334c4E856f4c9965ED682bD", decimals: 18, color: "#8247E5" },
@@ -262,7 +262,7 @@ function balanceOfCalldata(address: string): string {
 
 async function rpcCall(method: string, params: any[], chainId: number): Promise<any> {
   const customRpc = useCustomChainStore.getState().getById(chainId)?.rpcUrl;
-  const urls = [CHAIN_RPC_URLS[chainId], CHAIN_RPC_FALLBACKS[chainId], customRpc].filter(Boolean);
+  const urls = [CHAIN_RPC_URLS[chainId], CHAIN_RPC_FALLBACKS[chainId], customRpc].filter((u): u is string => Boolean(u));
   for (const rpcUrl of urls) {
     try {
       const res = await globalThis.fetch(rpcUrl, {
@@ -776,7 +776,7 @@ export function useEvmBalances(address: string | null, chainId: number | null) {
             const { getBalance } = await import("@wagmi/core");
             const result = await getBalance(config, {
               address: address as `0x${string}`,
-              chainId: resolvedChainId,
+              chainId: resolvedChainId as any, // wagmi chain union — runtime-validated against configured chains
             });
             return Number(result.value) / 1e18;
           } catch { /* fall through */ }

@@ -67,7 +67,7 @@ export interface PriceSourceStatus {
 export interface RepairAction {
   ts:       number;
   type:     "circuit-opened" | "circuit-recovered" | "price-failover" | "stale-repair"
-            | "rate-limit" | "route-degraded" | "route-recovered" | "stale-fixed";
+            | "rate-limit" | "route-degraded" | "route-recovered" | "stale-fixed" | "stale-detected";
   target:   string;
   detail:   string;
 }

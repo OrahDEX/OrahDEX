@@ -84,8 +84,12 @@ const EVM_NETWORKS = new Set([
 const BSV_ADDRESS_RE = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
 
 router.post("/withdrawals", async (req, res) => {
-  const { walletAddress, asset, amount, network, networkLabel, recipient, fee, signature, bsvSignerAddress } = req.body;
-  if (walletAddress && !checkWithdrawRateLimit(req, res, String(walletAddress).toLowerCase())) return;
+  // Normalise to lowercase so DB lookups match regardless of EVM checksum casing
+  const walletAddress: string | undefined = req.body.walletAddress
+    ? String(req.body.walletAddress).toLowerCase()
+    : req.body.walletAddress;
+  const { asset, amount, network, networkLabel, recipient, fee, signature, bsvSignerAddress } = req.body;
+  if (walletAddress && !checkWithdrawRateLimit(req, res, walletAddress)) return;
 
   if (!walletAddress || !asset || !amount || !network || !recipient) {
     res.status(400).json({ error: "Missing required fields: walletAddress, asset, amount, network, recipient" });
@@ -215,7 +219,11 @@ router.post("/withdrawals", async (req, res) => {
     const seeded      = parseFloat(balRows[0]?.seeded ?? "0");
     const withdrawable = Math.max(0, available - seeded);
 
-    if (withdrawable < parsed) {
+    // Allow up to 1 satoshi (1e-8) of floating-point rounding slack so that
+    // a MAX withdrawal whose .toFixed(8) rounds up by a sub-satoshi amount
+    // isn't incorrectly rejected.
+    const EPSILON = 1e-8;
+    if (withdrawable + EPSILON < parsed) {
       await client.query("ROLLBACK");
       const realBalance = withdrawable.toFixed(8);
       res.status(400).json({
@@ -226,12 +234,15 @@ router.post("/withdrawals", async (req, res) => {
       return;
     }
 
+    // Clamp to actual available so we never debit more than the ledger holds
+    const effectiveParsed = Math.min(parsed, available);
+
     // Deduct from available immediately so the balance reflects the pending withdrawal
     await client.query(
       `UPDATE user_balances
        SET available = available - $1, updated_at = now()
        WHERE wallet_address = $2 AND asset_symbol = $3`,
-      [parsed.toString(), walletAddress, asset],
+      [effectiveParsed.toString(), walletAddress, asset],
     );
 
     // Record the withdrawal request (using same client so it's in the same transaction)
@@ -239,19 +250,19 @@ router.post("/withdrawals", async (req, res) => {
       `INSERT INTO withdrawal_requests
          (id, wallet_address, asset, amount, network, network_label, recipient, fee, status, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', now())`,
-      [id, walletAddress, asset, parsed.toString(), network, networkLabel ?? network, recipient, fee ?? null],
+      [id, walletAddress, asset, effectiveParsed.toString(), network, networkLabel ?? network, recipient, fee ?? null],
     );
 
     await client.query("COMMIT");
 
-    req.log.info({ id, walletAddress, asset, amount: parsed, network, recipient }, "withdrawals: request created and balance deducted");
+    req.log.info({ id, walletAddress, asset, amount: effectiveParsed, network, recipient }, "withdrawals: request created and balance deducted");
 
     // ── Attempt immediate on-chain processing ─────────────────────────────────
     // Run async so the HTTP response is fast. Errors are caught internally and
     // leave the request in "pending" for admin fallback.
     setImmediate(async () => {
       try {
-        const result = await processWithdrawal({ asset, amount: parsed, network, recipient });
+        const result = await processWithdrawal({ asset, amount: effectiveParsed, network, recipient });
 
         if (result.status === "completed" && result.txid) {
           await pool.query(

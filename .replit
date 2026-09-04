@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "python-3.12", "postgresql-16"]
+modules = ["nodejs-20", "web", "python-3.12"]
 
 [[artifacts]]
 id = "artifacts/api-server"
@@ -8,9 +8,7 @@ id = "artifacts/bsv-dex"
 
 [deployment]
 router = "application"
-deploymentTarget = "vm"
-run = ["node", "start.mjs"]
-build = ["bash", "-c", "pnpm install --frozen-lockfile --prefer-offline && pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/bsv-dex run build"]
+deploymentTarget = "autoscale"
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
@@ -18,82 +16,34 @@ env = { "CI" = "true" }
 
 [[ports]]
 localPort = 8080
-
-[[ports]]
-localPort = 8081
+externalPort = 3000
 
 [[ports]]
 localPort = 20180
+externalPort = 80
 
 [workflows]
+runButton = "Project"
 
 [[workflows.workflow]]
-name = "artifacts/bsv-dex: web"
+name = "Project"
+mode = "parallel"
 author = "agent"
-mode = "sequential"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-artifactId = "artifacts/bsv-dex"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node serve-static.mjs"
-cwd = "./artifacts/bsv-dex"
-waitForPort = 20180
-ensurePreviewReachable = "/"
-router = "path"
-
-[workflows.workflow.tasks.env]
-PORT = "20180"
-BASE_PATH = "/"
-
-[[workflows.workflow]]
-name = "artifacts/api-server: API Server"
-author = "agent"
-mode = "sequential"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-artifactId = "3B4_FFSkEVBkAeYMFRJ2e"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @workspace/api-server run dev"
-cwd = "./artifacts/api-server"
 waitForPort = 8080
-ensurePreviewReachable = "/"
-router = "path"
-
-[workflows.workflow.tasks.env]
-PORT = "8080"
-
-[[workflows.workflow]]
-name = "artifacts/mockup-sandbox: Component Preview Server"
-author = "agent"
-mode = "sequential"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-artifactId = "XegfDyZt7HqfW2Bb8Ghoy"
-isCanvasWorkflow = true
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm --filter @workspace/mockup-sandbox run dev"
-cwd = "./artifacts/mockup-sandbox"
-waitForPort = 8081
-ensurePreviewReachable = "/"
-router = "path"
-
-[workflows.workflow.tasks.env]
-PORT = "8081"
-BASE_PATH = "/__mockup"
+args = "PORT=20180 pnpm --filter @workspace/bsv-dex run dev"
+waitForPort = 20180
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
-integrations = ["github:1.0.0", "javascript_openai_ai_integrations:2.0.0", "javascript_anthropic_ai_integrations:2.0.0"]
+integrations = ["github:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -108,6 +58,5 @@ channel = "stable-25_05"
 VAULT_CONTRACT_ADDRESS = "0x67C7f23eE49B6417661748F23F743C0B274039e2"
 VAULT_CHAIN_ID = "8453"
 VITE_REOWN_PROJECT_ID = "04663615251cf13fb1b043d754e7a17f"
-AWS_REGION = "us-east-1"
-AWS_S3_BUCKET = "orahdex.org"
-AWS_S3_ACCESS_POINT = "orahdex-1oynoh3ehk8imhgs46cay7pnj9b3cuse1a-s3alias"
+"Changenow API" = "c61ed1326058e7f9855f23eb6436c4a1ffe83ef2be5a4fb52412e7031edc5d45"
+API_KEY_HMAC_SECRET = "93b561e99b3431a3a579ed6fcc0da63606efdf0fac6a06bb26e73fd6772f1053"

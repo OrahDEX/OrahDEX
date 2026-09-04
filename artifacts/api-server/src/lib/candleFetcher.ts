@@ -500,10 +500,17 @@ export function resampleCandles(candles: Candle[], targetInterval: '1w' | '1M'):
   return Array.from(buckets.values()).sort((a, b) => a.time - b.time) as unknown as Candle[];
 }
 
-/* ── Pin the last candle's close to the live price ──────────────────────────── */
+/* ── Pin the last candle's close to the live price (guarded) ─────────────────
+   Only adjust when lastPrice is within 2% of the exchange bar close.
+   Prevents bad DB/cross-rate prices (e.g. 62617 vs OKX ~64000) from creating
+   a huge wick that collapses the chart on 1m/1h and other intervals.        */
 function pinLastCandle(candles: Candle[], lastPrice: number): Candle[] {
   if (!candles.length || !(lastPrice > 0)) return candles;
   const last = candles[candles.length - 1]!;
+  const ref = last.close > 0 ? last.close : last.open;
+  if (!(ref > 0)) return candles;
+  const ratio = lastPrice / ref;
+  if (ratio < 0.98 || ratio > 1.02) return candles;
   candles[candles.length - 1] = {
     ...last,
     close: lastPrice,
@@ -522,7 +529,7 @@ function isValidCandleSet(candles: Candle[], minCount: number): boolean {
   return unique.size > 1;
 }
 
-/* ── Main export ───────────────────────────────────────────────────────────────── */
+/* ── Main export ─────────────────────────────────────────────────────────────── */
 export async function fetchRealCandles(
   symbol:    string,
   lastPrice: number,

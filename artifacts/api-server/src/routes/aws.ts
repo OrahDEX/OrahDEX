@@ -34,7 +34,7 @@ router.get("/aws/status", (_req, res) => {
 router.get("/aws/s3/list", async (req, res) => {
   const prefix = typeof req.query.prefix === "string" ? req.query.prefix : undefined;
   const result = await s3List(prefix);
-  if (!result.ok) return res.status(500).json({ error: result.error });
+  if (!result.ok) { res.status(500).json({ error: result.error }); return; }
   res.json({ keys: result.keys });
 });
 
@@ -42,7 +42,7 @@ router.get("/aws/s3/list", async (req, res) => {
 
 router.get("/aws/s3/exists", async (req, res) => {
   const key = typeof req.query.key === "string" ? req.query.key : "";
-  if (!key) return res.status(400).json({ error: "key required" });
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
   const exists = await s3Exists(key);
   res.json({ exists });
 });
@@ -55,14 +55,14 @@ router.post("/aws/s3/upload", async (req, res) => {
   const contentType = typeof req.query.contentType === "string" ? req.query.contentType : "application/octet-stream";
   const isPublic    = req.query.public === "true";
 
-  if (!key) return res.status(400).json({ error: "key query param required" });
+  if (!key) { res.status(400).json({ error: "key query param required" }); return; }
 
   const chunks: Buffer[] = [];
   req.on("data", (chunk: Buffer) => chunks.push(chunk));
   req.on("end", async () => {
     const body   = Buffer.concat(chunks);
     const result = await s3Upload({ key, body, contentType, public: isPublic });
-    if (!result.ok) return res.status(500).json({ error: result.error });
+    if (!result.ok) { res.status(500).json({ error: result.error }); return; }
     res.json({ ok: true, key: result.key, url: result.url ?? null });
   });
   req.on("error", (err) => {
@@ -75,10 +75,10 @@ router.post("/aws/s3/upload", async (req, res) => {
 
 router.get("/aws/s3/download", async (req, res) => {
   const key = typeof req.query.key === "string" ? req.query.key : "";
-  if (!key) return res.status(400).json({ error: "key required" });
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
 
   const result = await s3Download(key);
-  if (!result.ok) return res.status(500).json({ error: result.error });
+  if (!result.ok) { res.status(500).json({ error: result.error }); return; }
 
   res.setHeader("Content-Type", result.contentType ?? "application/octet-stream");
   res.setHeader("Content-Disposition", `attachment; filename="${key.split("/").pop()}"`);
@@ -89,10 +89,10 @@ router.get("/aws/s3/download", async (req, res) => {
 
 router.delete("/aws/s3/delete", async (req, res) => {
   const key = typeof req.query.key === "string" ? req.query.key : "";
-  if (!key) return res.status(400).json({ error: "key required" });
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
 
   const result = await s3Delete(key);
-  if (!result.ok) return res.status(500).json({ error: result.error });
+  if (!result.ok) { res.status(500).json({ error: result.error }); return; }
   res.json({ ok: true });
 });
 
@@ -101,10 +101,10 @@ router.delete("/aws/s3/delete", async (req, res) => {
 router.get("/aws/s3/presign/get", async (req, res) => {
   const key     = typeof req.query.key === "string"     ? req.query.key     : "";
   const expires = typeof req.query.expires === "string" ? parseInt(req.query.expires) : 3600;
-  if (!key) return res.status(400).json({ error: "key required" });
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
 
   const result = await s3PresignedGetUrl(key, expires);
-  if (!result.ok) return res.status(500).json({ error: result.error });
+  if (!result.ok) { res.status(500).json({ error: result.error }); return; }
   res.json({ url: result.url });
 });
 
@@ -116,14 +116,14 @@ router.post("/aws/s3/presign/put", async (req, res) => {
     contentType?: string;
     expires?: number;
   };
-  if (!key) return res.status(400).json({ error: "key required" });
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
 
   const result = await s3PresignedPutUrl(
     key,
     contentType ?? "application/octet-stream",
     expires ?? 900,
   );
-  if (!result.ok) return res.status(500).json({ error: result.error });
+  if (!result.ok) { res.status(500).json({ error: result.error }); return; }
   res.json({ url: result.url, key });
 });
 
@@ -139,11 +139,12 @@ router.post("/aws/ses/send", async (req, res) => {
   };
 
   if (!from || !to || !subject || !text) {
-    return res.status(400).json({ error: "from, to, subject, text are required" });
+    res.status(400).json({ error: "from, to, subject, text are required" });
+    return;
   }
 
   const result = await sesSendMail({ from, to, subject, text, html });
-  if (!result.ok) return res.status(500).json({ error: result.error });
+  if (!result.ok) { res.status(500).json({ error: result.error }); return; }
   res.json({ ok: true, messageId: result.messageId });
 });
 
@@ -157,7 +158,7 @@ router.post("/aws/ses/test", async (req, res) => {
     subject: "OrahDEX — AWS SES connection test",
     text:    "This is an automated SES connection test from OrahDEX admin panel.",
   });
-  if (!result.ok) return res.status(500).json({ error: result.error });
+  if (!result.ok) { res.status(500).json({ error: result.error }); return; }
   res.json({ ok: true, messageId: result.messageId });
 });
 

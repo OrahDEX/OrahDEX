@@ -152,3 +152,4 @@ export async function withDbRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export * from "./schema";
+export type { PoolClient } from "pg";

@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orahdex
+      # Require POSTGRES_PASSWORD to be set in deploy/.env (no fallback defaults allowed)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: orahdex
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Expose DB port for local development only. Remove in production.
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    # One-shot migration service for local workflows. It runs migrations then exits.
+    image: node:20-alpine
+    working_dir: /work
+    volumes:
+      - ..:/work:ro
+      - ./scripts:/work/deploy/scripts:ro
+    env_file: .env
+    entrypoint: ["/bin/sh","-c"]
+    command: "[ -x ./deploy/scripts/migrate-db.sh ] && ./deploy/scripts/migrate-db.sh .. || echo 'No migrate script found; skipping'"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      # When this kit is placed at repo-root/deploy, context: .. equals repo root
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      # Use the explicit POSTGRES_PASSWORD from .env; no inline fallback
+      DATABASE_URL: "postgresql://orahdex:${POSTGRES_PASSWORD}@db:5432/orahdex"
+      NODE_ENV: production
+      NODE_OPTIONS: "${NODE_OPTIONS:---max-old-space-size=4096}"
+    ports:
+      - "8080:8080"
+    # IMPORTANT: single replica — in-process background workers
+    deploy:
+      replicas: 1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

@@ -390,6 +390,23 @@ export function MobilePortfolio({ visibleTabs, hidePreContent }: { visibleTabs?:
   });
   const myOrders: any[] = Array.isArray(ordersData) ? ordersData : [];
 
+  // ── OrahDEX internal exchange balance (user_balances) ────────────────────────
+  const { data: exchangePortfolio, refetch: refetchExchange } = useQuery<{ balances: any[] }>({
+    queryKey: ["orah-exchange-balance", ledgerAddress],
+    queryFn:  async () => {
+      if (!ledgerAddress) return { balances: [] };
+      const r = await fetch(`${BASE}/api/portfolio?walletAddress=${encodeURIComponent(ledgerAddress)}`);
+      if (!r.ok) return { balances: [] };
+      const d = await r.json();
+      return { balances: Array.isArray(d?.balances) ? d.balances : Array.isArray(d) ? d : [] };
+    },
+    enabled: !!ledgerAddress,
+    refetchInterval: 30_000,
+    staleTime:       15_000,
+  });
+  const exchangeBalances: any[] = exchangePortfolio?.balances ?? [];
+  const nonZeroExchange = exchangeBalances.filter(b => parseFloat(b.available ?? b.total ?? "0") > 0);
+
   const { data: historyData = [], isLoading: historyLoading } = useQuery<any[]>({
     queryKey: ["trade-history", ledgerAddress],
     queryFn: () => fetch(`${BASE}/api/trades/history?walletAddress=${encodeURIComponent(ledgerAddress || "")}&limit=100`).then(r => r.json()),
@@ -955,6 +972,67 @@ export function MobilePortfolio({ visibleTabs, hidePreContent }: { visibleTabs?:
                       <div className="text-right shrink-0 ml-3">
                         <div className="text-xs font-mono text-foreground">{v.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })}</div>
                         {usdVal > 0 && <div className="text-[10px] text-muted-foreground">≈ {formatQuoteAmount(usdVal, quoteCurrency)}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── BUCKET 3: OrahDEX Exchange Balance ──────────────────────────────── */}
+          {nonZeroExchange.length > 0 && (
+            <div className="bg-emerald-500/5 border border-emerald-500/25 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <Zap size={14} className="text-emerald-400" />
+                  <span className="text-sm font-bold text-foreground">OrahDEX Balance</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">Trading</span>
+                </div>
+                <button onClick={() => refetchExchange()} className="text-emerald-400/60 hover:text-emerald-400 transition-colors">
+                  <RefreshCw size={12} />
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mb-3">
+                Funds in your OrahDEX trading account — ready to trade or withdraw to your wallet.
+              </p>
+              <div className="space-y-2.5">
+                {nonZeroExchange.map((b: any) => {
+                  const avail  = parseFloat(b.available ?? "0");
+                  const locked = parseFloat(b.locked ?? "0");
+                  const usdVal = parseFloat(b.value ?? "0") || avail * (parseFloat(b.price ?? "0") || 0);
+                  const net    = ASSET_NETWORK_MAP[b.asset] ?? { network: "evm", networkLabel: b.asset, placeholder: "" };
+                  const color  = ASSET_COLORS[b.asset] ?? "#6B7280";
+                  return (
+                    <div key={b.asset} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ backgroundColor: color }}>
+                          {b.asset.slice(0, 2)}
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold text-foreground">{b.asset}</span>
+                          {locked > 0 && (
+                            <div className="text-[9px] text-orange-400">{locked.toLocaleString(undefined, { maximumFractionDigits: 6 })} in orders</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-xs font-mono text-foreground">{avail.toLocaleString(undefined, { maximumFractionDigits: 8 })}</div>
+                          {usdVal > 0 && <div className="text-[10px] text-muted-foreground">{formatQuoteAmount(usdVal, quoteCurrency)}</div>}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setWithdrawAsset({ asset: b.asset, available: avail, network: net.network, networkLabel: net.networkLabel, color });
+                            setWithdrawInitialTab("withdraw");
+                            setWithdrawVisibleTabs(["withdraw", "deposit", "history"]);
+                            setWithdrawOpen(true);
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-all text-[11px] font-semibold"
+                        >
+                          <ArrowUpRight size={12} />
+                          Withdraw
+                        </button>
                       </div>
                     </div>
                   );

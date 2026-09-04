@@ -69,7 +69,7 @@ function explorerBase(chainId: number | null): string {
     11155111: "https://sepolia.etherscan.io",
     84532:    "https://sepolia.basescan.org",
   };
-  return (chainId && map[chainId]) ?? "https://etherscan.io";
+  return (chainId ? map[chainId] : undefined) ?? "https://etherscan.io";
 }
 
 function formatAmount(rawAmount: bigint, decimals: number): string {

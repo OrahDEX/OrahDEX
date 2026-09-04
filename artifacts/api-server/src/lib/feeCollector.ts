@@ -28,7 +28,8 @@ export type FeeSource =
   | "lp_spread"
   | "p2p"
   | "withdrawal"
-  | "bridge";
+  | "bridge"
+  | "le_autoroute";
 
 /**
  * Record a platform fee. Non-throwing — logs errors silently so that

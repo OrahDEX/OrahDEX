@@ -64,7 +64,7 @@ export function getCachedTokenMeta(
 }
 
 export function getAllCachedSymbols(): string[] {
-  const set = new Set([...NATIVE_LOGOS].map(([k]) => k));
+  const set = new Set(Object.keys(NATIVE_LOGOS));
   for (const sym of tokenMeta.keys()) set.add(sym);
   return Array.from(set).sort();
 }

@@ -22,7 +22,7 @@ const networks = [
   solana, solanaTestnet, solanaDevnet,
   // Bitcoin
   bitcoin, bitcoinTestnet,
-] as const;
+];
 
 /**
  * localStorage key that persists the user's last chosen EVM chainId across sessions.
@@ -65,7 +65,7 @@ const _initialThemeMode: "dark" | "light" = _storedTheme === "light" ? "light" :
 const evmNetworks = [
   mainnet, polygon, arbitrum, optimism, base, bsc, avalanche,
   linea, zkSync, scroll, sepolia,
-] as const;
+];
 
 export const wagmiAdapter  = new WagmiAdapter({ projectId, networks: evmNetworks });
 export const solanaAdapter  = new SolanaAdapter();
@@ -74,7 +74,7 @@ export const bitcoinAdapter = new BitcoinAdapter();
 const appKit = createAppKit({
   adapters: [wagmiAdapter, solanaAdapter, bitcoinAdapter],
   projectId,
-  networks,
+  networks: networks as unknown as Parameters<typeof createAppKit>[0]["networks"],
   defaultNetwork: initialNetwork,
   metadata: {
     name: "OrahDEX",
@@ -90,7 +90,6 @@ const appKit = createAppKit({
     socials:       false,   // native social login handled in WalletChooserDialog
     onramp:        true,
     swaps:         true,
-    smartAccounts: true,
   },
   enableWallets: true,
   themeMode: _initialThemeMode,

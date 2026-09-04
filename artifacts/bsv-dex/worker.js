@@ -1,0 +1,1 @@
+export default{async fetch(r,e){let u=new URL(r.url);if(u.pathname.startsWith("/api"))return fetch("https://748c5e24-ef08-447f-a71b-5e9894ce4896-00-3bzpx34oxbhbj.janeway.replit.dev"+u.pathname+u.search,r);return e.ASSETS.fetch(r)}};

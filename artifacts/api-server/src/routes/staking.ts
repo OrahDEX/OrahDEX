@@ -258,7 +258,7 @@ router.get("/staking/positions", async (req, res) => {
 // The client signs the returned `message` and includes nonce+signature in /stake.
 router.post("/staking/challenge", (req, res) => {
   const { walletAddress, coin, amount, lockDays } = req.body ?? {};
-  if (!walletAddress || !coin || !amount || !lockDays) {
+  if (!walletAddress || !coin || !amount || lockDays == null || lockDays === "") {
     res.status(400).json({ error: "walletAddress, coin, amount and lockDays are required" });
     return;
   }
@@ -288,8 +288,8 @@ router.post("/staking/stake", async (req, res) => {
     return;
   }
   const days = parseInt(String(lockDays), 10);
-  if (!days || days < 1) {
-    res.status(400).json({ error: "lockDays must be a positive integer" });
+  if (isNaN(days) || days < 0) {
+    res.status(400).json({ error: "lockDays must be 0 or a positive integer" });
     return;
   }
   const coinMeta = POS_COINS.find(c => c.symbol === String(coin).toUpperCase());

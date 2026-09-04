@@ -68,7 +68,7 @@ export const CHAIN_TOKEN_ADDRESSES: Record<number, Partial<Record<string, string
     SUSHI:   "0x6B3595068778DD592e39A122f4f5a5cF09C90fE2",
     "1INCH": "0x111111111117dC0aa78b770fA6A738034120C302",
     GRT:     "0xc944E90C64B2c07662A292be6244BDf05Cda44a7",
-    LDO:     "0x5A98FcBEA516Cf06857215779Fd812CA3beF1b32",
+    LDO:     "0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32",
     RPL:     "0xD33526068D116cE69F19A9ee46F0bd304F21A51f",
     DYDX:    "0x92D6C1e31e14520e676a687F0a93788B716BEff5",
     LRC:     "0xBBbbCA6A901c926F240b89EacB641d8Aec7AEafD",
@@ -86,7 +86,7 @@ export const CHAIN_TOKEN_ADDRESSES: Record<number, Partial<Record<string, string
     // Gaming / metaverse
     A8:      "0x3e5a19c91266ad8ce2477b91585d1856b84062df",
     MANA:    "0x0F5D2fB29fb7d3CFeE444a200298f468908cC942",
-    SAND:    "0x3845badAde8e6dFF049820680d1F14Bd3903a5d0",
+    SAND:    "0x3845badAde8e6dFF049820680d1F14bD3903a5d0",
     AXS:     "0xBB0E17EF65F82Ab018d8EDd776e8DD940327B28b",
     APE:     "0x4d224452801ACEd8B2F0aEbe155379bb5D594381",
     CHZ:     "0x3506424f91fD33084466F402d5D97f05F8e3b4AF",
@@ -135,7 +135,7 @@ export const CHAIN_TOKEN_ADDRESSES: Record<number, Partial<Record<string, string
     DOGE:    "0xbA2aE424d960c26247Dd6c32edC70B295c744C43",
     LTC:     "0x4338665CBB7B2485A8855A139b75D5E34AB0DB94",
     MATIC:   "0xCC42724C6683B7E57334c4E856f4c9965ED682bD",
-    AVAX:    "0x1CE0c2827e2EF14D5C4f29a091d735A204794041",
+    AVAX:    "0x1CE0c2827e2eF14D5C4f29a091d735A204794041",
     ATOM:    "0x0Eb3a705fc54725037CC9e008bDede697f62F335",
     FTM:     "0xAD29AbB318791D579433D831ed122aFeAf29dcfe",
     INJ:     "0xa2B726B1145A4773F68593CF171187d8EBe4d495",
@@ -175,7 +175,7 @@ export const CHAIN_TOKEN_ADDRESSES: Record<number, Partial<Record<string, string
   // ── Base ────────────────────────────────────────────────────────────────────
   8453: {
     USDC:    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    USDBC:   "0xd9aAEc86b65D86f6A7B5B1b0c42FFA531710b6CA",
+    USDBC:   "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
     DAI:     "0x50c5725949A6F0c72E6c4a641f24049A917DB0Cb",
     USDT:    "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
     WETH:    "0x4200000000000000000000000000000000000006",
@@ -202,7 +202,7 @@ export const CHAIN_TOKEN_ADDRESSES: Record<number, Partial<Record<string, string
     UNI:     "0xFa7F8980b0f1E64A2062791cc3b0871572f1f7f0",
     GMX:     "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a",
     MAGIC:   "0x539bdE0d7Dbd336b79148AA742883198BBF60342",
-    RDNT:    "0x3082CC23568ea640225c2467653dB90e9250aAA0",
+    RDNT:    "0x3082CC23568eA640225c2467653dB90e9250aAA0",
     PENDLE:  "0x0c880f6761F1af8d9aA9C466984b80DAb9a8c9e8",
     SUSHI:   "0xd4d42F0b6DEF4CE0383636770eF773390d85c61A",
     CRV:     "0x11cDb42B0EB46d95f990BedD4695A6E3fA034978",
@@ -216,7 +216,7 @@ export const CHAIN_TOKEN_ADDRESSES: Record<number, Partial<Record<string, string
   // ── Optimism ────────────────────────────────────────────────────────────────
   10: {
     USDC:    "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
-    USDCE:   "0x7F5c764cBC14f9669B88837ca1490cCa17c31607",
+    USDCE:   "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
     USDT:    "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
     DAI:     "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
     WETH:    "0x4200000000000000000000000000000000000006",
@@ -437,7 +437,7 @@ async function sendTx(
     to,
     data,
     value: valueWei,
-    chainId,
+    chainId: chainId as any, // wagmi chain union — runtime-validated
   });
 }
 
@@ -458,7 +458,7 @@ async function approveErc20(
     abi:          erc20Abi,
     functionName: "approve",
     args:         [spender, amount],
-    chainId,
+    chainId:      chainId as any, // wagmi chain union — runtime-validated
   });
 }
 

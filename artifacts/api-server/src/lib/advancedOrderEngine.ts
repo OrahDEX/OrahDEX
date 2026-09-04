@@ -1,11 +1,11 @@
-import { pool } from "@workspace/db";
+import { pool, type PoolClient } from "@workspace/db";
 import { logger } from "../lib/logger.js";
 import { randomUUID } from "node:crypto";
 import { isDbConnError } from "./dbErrors.js";
 import { guardedInterval, withRetry } from "./selfHealing.js";
 
 async function runTrailingStopEngine(): Promise<void> {
-  let client: Awaited<ReturnType<typeof pool.connect>> | null = null;
+  let client: PoolClient | null = null;
   try {
     client = await withRetry(() => pool.connect(), { maxAttempts: 2, baseDelayMs: 500 });
   } catch (err) {
@@ -141,7 +141,7 @@ async function runTrailingStopEngine(): Promise<void> {
 }
 
 async function runIcebergEngine(): Promise<void> {
-  let client: Awaited<ReturnType<typeof pool.connect>> | null = null;
+  let client: PoolClient | null = null;
   try {
     client = await withRetry(() => pool.connect(), { maxAttempts: 2, baseDelayMs: 500 });
   } catch (err) {
@@ -247,7 +247,7 @@ async function runIcebergEngine(): Promise<void> {
 }
 
 async function runTwapEngine(): Promise<void> {
-  let client: Awaited<ReturnType<typeof pool.connect>> | null = null;
+  let client: PoolClient | null = null;
   try {
     client = await withRetry(() => pool.connect(), { maxAttempts: 2, baseDelayMs: 500 });
   } catch (err) {

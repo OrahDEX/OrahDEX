@@ -209,10 +209,10 @@ function CreateView({ onWalletReady }: { onWalletReady: (w: ConnectedWallet) => 
     setRevealed(false); setCopied(false); setConfirmed(false);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!confirmed || !revealed) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const address = deriveAddress(mnemonic, network);
+    const address = await deriveAddress(mnemonic, network);
     onWalletReady({ address, provider: "aura-wallet", network });
   };
 
@@ -321,12 +321,12 @@ function ImportView({ onWalletReady }: { onWalletReady: (w: ConnectedWallet) => 
 
   const wordCount = input.trim().split(/\s+/).filter(Boolean).length;
 
-  const handleImport = () => {
+  const handleImport = async () => {
     const result = validateMnemonic(input);
     if (!result.valid) { setError(result.error ?? "Invalid phrase"); return; }
     setError(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const addr = deriveAddress(result.words, network);
+    const addr = await deriveAddress(result.words, network);
     onWalletReady({ address: addr, provider: "aura-wallet", network });
   };  return (
     <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }}>

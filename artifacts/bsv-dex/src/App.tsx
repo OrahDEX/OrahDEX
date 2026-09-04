@@ -1,6 +1,7 @@
 import { useEffect, useRef, ReactNode, lazy, Suspense, Component } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Toaster } from "@/components/ui/toaster";
 import { PinPromptModal } from "@/components/PinPromptModal";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -626,6 +627,8 @@ function AppContent() {
       <WalletChooserDialog />
       {/* OrahWallet passkey dialog — opens after social/email login */}
       <OrahWalletDialogGlobal />
+      {/* Vercel Speed Insights — tracks Web Vitals and performance metrics */}
+      <SpeedInsights />
     </>
   );
 }
