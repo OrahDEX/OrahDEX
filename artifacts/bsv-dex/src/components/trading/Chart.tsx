@@ -1088,31 +1088,3 @@ function OrahChart({ symbol, interval, onIntervalChange, subIndicator: subIndica
           <div ref={subRef} className="w-full" style={{ height: '103px' }} />
         </div>
       )}
-
-      {/* ── BOTTOM STATUS BAR ── */}
-      <div className="px-3 py-1 border-t shrink-0 flex items-center justify-between" style={{ borderColor: col.grid }}>
-        <span className="text-[10px]" style={{ color: col.text, opacity: 0.5 }}>
-          {parts.base}/{parts.quote} · {INTERVALS.find(i => i.id === effectiveInterval)?.label ?? effectiveInterval}
-          {autoInterval ? <span style={{ color: '#60a5fa' }}> · Auto</span> : null}
-          {' '}· OrahDEX Sovereign Engine
-        </span>
-        <div className="flex items-center gap-2">
-          {activeOverlays.size > 0 && (
-            <span className="text-[10px] text-green-400/60">
-              {[...activeOverlays].map(id => OVERLAY_INDICATORS.find(o => o.id === id)?.label).filter(Boolean).join(' · ')}
-            </span>
-          )}
-          <span className="text-[10px] text-green-400/60 font-mono">BSV ⚡</span>
-        </div>
-      </div>
-
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   EXPORT
-══════════════════════════════════════════════════════════════════════════ */
-export function Chart({ symbol = 'BTC/USDT', interval = '1h', onIntervalChange, subIndicator, hideIntervalBar, data }: ChartProps) {
-  return <OrahChart symbol={symbol} interval={interval} onIntervalChange={onIntervalChange} subIndicator={subIndicator} hideIntervalBar={hideIntervalBar} data={data} />;
-}
